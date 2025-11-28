@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信备份工具 (Bak UI)</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; color: #333; }
+        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; }
+        h1 { margin: 0; color: #2c3e50; }
+        p { color: #7f8c8d; margin-top: 5px; }
+
+        .form-group { margin-bottom: 25px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #34495e; }
+        .input-group { display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9; color: #555; font-size: 14px; }
+        
+        button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 14px; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+        .btn-secondary:hover { background-color: #5a6268; }
+        
+        .actions { margin-top: 30px; }
+        .btn-primary { background-color: #007bff; color: white; width: 100%; font-size: 16px; padding: 15px; }
+        .btn-primary:hover { background-color: #0069d9; }
+        .btn-primary:disabled { background-color: #a0c4eb; cursor: not-allowed; }
+        
+        .btn-danger { background-color: #dc3545; color: white; width: 100%; font-size: 16px; padding: 15px; display: none; }
+        .btn-danger:hover { background-color: #c82333; }
+
+        /* History Section */
+        .history-section { margin-bottom: 25px; border: 1px solid #e9ecef; border-radius: 6px; padding: 15px; background: #fcfcfc; }
+        .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; }
+        .history-title { font-weight: 600; color: #495057; margin: 0; font-size: 14px; display: flex; align-items: center; gap: 5px; }
+        .history-list { list-style: none; padding: 0; margin: 0; display: none; }
+        .history-item { padding: 10px; border-bottom: 1px solid #f1f1f1; cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: background-color 0.2s; }
+        .history-item:last-child { border-bottom: none; }
+        .history-item:hover { background-color: #f1f8ff; }
+        .history-paths { font-size: 13px; color: #333; display: flex; align-items: center; gap: 8px; }
+        .history-arrow { color: #adb5bd; font-size: 12px; }
+        .history-time { font-size: 11px; color: #999; }
+        .history-toggle { transform: rotate(0deg); transition: transform 0.2s; }
+        .history-toggle.open { transform: rotate(90deg); }
+
+        /* Progress Section */
+        #progress-section { margin-top: 30px; display: none; border-top: 1px solid #eee; padding-top: 20px; }
+        .status-text { font-size: 1.1em; font-weight: bold; text-align: center; margin-bottom: 15px; color: #007bff; }
+        
+        .progress-container { margin-bottom: 20px; }
+        .progress-bar-bg { height: 24px; background-color: #e9ecef; border-radius: 12px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
+        .progress-bar-fill { height: 100%; background-color: #28a745; width: 0%; transition: width 0.3s ease; background-image: linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent); background-size: 1rem 1rem; }
+        
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center; margin-bottom: 20px; }
+        .stat-item { background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #e9ecef; }
+        .stat-label { display: block; font-size: 12px; color: #6c757d; margin-bottom: 4px; }
+        .stat-value { font-weight: bold; color: #343a40; }
+
+        .log-box { height: 250px; overflow-y: auto; background: #212529; color: #00ff00; padding: 15px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 13px; line-height: 1.4; }
+        .log-entry { margin-bottom: 2px; word-break: break-all; }
+        .log-entry.error { color: #ff6b6b; }
+        .log-entry.skip { color: #868e96; }
+        
+        /* Scrollbar for log */
+        .log-box::-webkit-scrollbar { width: 8px; }
+        .log-box::-webkit-scrollbar-track { background: #333; }
+        .log-box::-webkit-scrollbar-thumb { background: #666; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>备份工具</h1>
+        <p>简单、高效的增量备份方案</p>
+    </header>
+
+    <div class="history-section" id="history-section" style="display: none;">
+        <div class="history-header" onclick="toggleHistory()">
+            <div class="history-title">
+                <span class="history-toggle">▶</span>
+                最近使用的备份路径
+            </div>
+            <button class="btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="clearHistory(event)">清空记录</button>
+        </div>
+        <ul class="history-list" id="history-list">
+            <!-- History items will be inserted here -->
+        </ul>
+    </div>
+
+    <div class="form-group">
+        <label for="src-path">源目录 (文件路径)</label>
+        <div class="input-group">
+            <input type="text" id="src-path" readonly placeholder="请选择要备份的文件夹...">
+            <button class="btn-secondary" onclick="selectFolder('src')">选择...</button>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="dst-path">目标目录 (U盘备份路径)</label>
+        <div class="input-group">
+            <input type="text" id="dst-path" readonly placeholder="请选择备份保存的位置...">
+            <button class="btn-secondary" onclick="selectFolder('dst')">选择...</button>
+        </div>
+    </div>
+
+    <div class="actions">
+        <button id="btn-start" class="btn-primary" onclick="startBackup()">开始备份</button>
+        <button id="btn-stop" class="btn-danger" onclick="stopBackup()">停止备份</button>
+    </div>
+
+    <div id="progress-section">
+        <div class="status-text" id="status-text">准备就绪</div>
+        
+        <div class="progress-container">
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progress-bar"></div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="stat-label">文件进度</span>
+                <div class="stat-value" id="file-count">0 / 0</div>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">数据量</span>
+                <div class="stat-value" id="byte-count">0 MB / 0 MB</div>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">传输速度</span>
+                <div class="stat-value" id="speed">0 MB/s</div>
+            </div>
+        </div>
+
+        <div class="log-box" id="log-box">
+            <!-- Logs go here -->
+        </div>
+    </div>
+</div>
+
+<script>
+    let eventSource = null;
+
+    // 初始化时加载历史记录
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadHistory);
+    } else {
+        loadHistory();
+    }
+
+    async function loadHistory() {
+        try {
+            const res = await fetch('/api/history');
+            const history = await res.json();
+            
+            // Log to log-box for debugging visibility
+            // setTimeout(() => log('Debug: History loaded, count=' + (history ? history.length : 0)), 1000);
+            
+            if (history && history.length > 0) {
+                renderHistory(history);
+            }
+        } catch (e) {
+            console.error('Failed to load history', e);
+        }
+    }
+
+    function renderHistory(history) {
+        const section = document.getElementById('history-section');
+        const list = document.getElementById('history-list');
+        
+        if (!list) {
+            console.error('Element with id "history-list" not found');
+            return;
+        }
+        
+        list.innerHTML = '';
+        
+        if (!history || history.length === 0) {
+            if (section) section.style.display = 'none';
+            return;
+        }
+        
+        if (section) section.style.display = 'block';
+        
+        history.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'history-item';
+            li.onclick = () => applyHistory(item.src, item.dst);
+            li.innerHTML = `
+                <div class="history-paths">
+                    <span title="${item.src}">${shortenPath(item.src)}</span>
+                    <span class="history-arrow">➜</span>
+                    <span title="${item.dst}">${shortenPath(item.dst)}</span>
+                </div>
+                <div class="history-time">上次备份: ${item.last_used}</div>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    function shortenPath(path) {
+        if (path.length > 25) {
+            return path.substring(0, 10) + '...' + path.substring(path.length - 12);
+        }
+        return path;
+    }
+
+    function toggleHistory() {
+        const list = document.getElementById('history-list');
+        const toggle = document.querySelector('.history-toggle');
+        if (list.style.display === 'none' || list.style.display === '') {
+            list.style.display = 'block';
+            toggle.classList.add('open');
+        } else {
+            list.style.display = 'none';
+            toggle.classList.remove('open');
+        }
+    }
+
+    function applyHistory(src, dst) {
+        document.getElementById('src-path').value = src;
+        document.getElementById('dst-path').value = dst;
+        // 自动折叠历史记录
+        document.getElementById('history-list').style.display = 'none';
+        document.querySelector('.history-toggle').classList.remove('open');
+    }
+
+    async function clearHistory(e) {
+        e.stopPropagation();
+        if (confirm('确定要清空历史记录吗？')) {
+            await fetch('/api/history', { method: 'DELETE' });
+            document.getElementById('history-section').style.display = 'none';
+        }
+    }
+
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    async function selectFolder(type) {
+        try {
+            const response = await fetch('/api/select-folder', { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById(type + '-path').value = data.path;
+            }
+        } catch (err) {
+            alert('无法打开文件夹选择框: ' + err);
+        }
+    }
+
+    function log(msg, type = 'info') {
+        const box = document.getElementById('log-box');
+        const div = document.createElement('div');
+        div.className = 'log-entry ' + type;
+        div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function startBackup() {
+        const src = document.getElementById('src-path').value;
+        const dst = document.getElementById('dst-path').value;
+
+        if (!src || !dst) {
+            alert('请先选择源目录和目标目录！');
+            return;
+        }
+
+        // UI State
+        document.getElementById('btn-start').style.display = 'none';
+        document.getElementById('btn-stop').style.display = 'block';
+        document.getElementById('progress-section').style.display = 'block';
+        document.getElementById('log-box').innerHTML = '';
+        document.getElementById('progress-bar').style.width = '0%';
+        
+        log('开始连接备份服务...');
+
+        if (eventSource) eventSource.close();
+
+        // Use encodeURIComponent for paths
+        const url = `/api/backup?src=${encodeURIComponent(src)}&dst=${encodeURIComponent(dst)}`;
+        eventSource = new EventSource(url);
+
+        eventSource.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            handleProgress(data);
+        };
+
+        eventSource.onerror = function(e) {
+            log('连接断开或发生错误', 'error');
+            stopBackup(false); // Client-side cleanup
+        };
+    }
+
+    async function stopBackup(notifyServer = true) {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+        
+        if (notifyServer) {
+            try {
+                await fetch('/api/stop', { method: 'POST' });
+                log('用户已停止备份', 'warn');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        document.getElementById('btn-start').style.display = 'block';
+        document.getElementById('btn-stop').style.display = 'none';
+        document.getElementById('status-text').textContent = '已停止';
+    }
+
+    function handleProgress(data) {
+        const statusText = document.getElementById('status-text');
+        
+        switch (data.type) {
+            case 'phase':
+                statusText.textContent = data.message;
+                log(data.message);
+                break;
+            case 'scan_result':
+                log(`扫描完成: 共 ${data.total_files} 个文件, ${formatBytes(data.total_bytes)}`);
+                break;
+            case 'progress':
+                const percent = (data.processed_bytes / data.total_bytes * 100).toFixed(1);
+                document.getElementById('progress-bar').style.width = percent + '%';
+                statusText.textContent = `正在备份... ${percent}%`;
+                
+                document.getElementById('file-count').textContent = `${data.processed_files} / ${data.total_files}`;
+                document.getElementById('byte-count').textContent = `${formatBytes(data.processed_bytes)} / ${formatBytes(data.total_bytes)}`;
+                document.getElementById('speed').textContent = `${formatBytes(data.speed)}/s`;
+                
+                if (data.action === 'copied') {
+                    log(`复制: ${data.current_file}`);
+                }
+                break;
+            case 'complete':
+                document.getElementById('progress-bar').style.width = '100%';
+                statusText.textContent = '备份完成！';
+                log(`备份成功完成！共复制 ${data.stats.copied} 个文件。`, 'success');
+                stopBackup(false);
+                break;
+            case 'error':
+                log(`错误: ${data.message}`, 'error');
+                statusText.textContent = '发生错误';
+                stopBackup(false);
+                break;
+            case 'info':
+                log(data.message);
+                break;
+        }
+    }
+</script>
+
+</body>
+</html>
+

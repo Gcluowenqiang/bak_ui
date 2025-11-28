@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.cursor/
+backup_history.json
+.DS_Store
+venv/
+.env
+.pytest_cache/
+description.md
+
