@@ -1,15 +1,14 @@
 import json
 import os
-import logging
 from datetime import datetime
-
-logger = logging.getLogger(__name__)
+from core.logger import Logger
 
 HISTORY_FILE = 'backup_history.json'
 
 class HistoryManager:
     def __init__(self, file_path=HISTORY_FILE):
         self.file_path = file_path
+        self.logger = Logger()
         self.history = self._load_history()
 
     def _load_history(self):
@@ -19,7 +18,7 @@ class HistoryManager:
             with open(self.file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            logger.error(f"加载历史记录失败: {e}")
+            self.logger.error(f"加载历史记录失败: {e}")
             return []
 
     def _save_history(self):
@@ -27,10 +26,10 @@ class HistoryManager:
             with open(self.file_path, 'w', encoding='utf-8') as f:
                 json.dump(self.history, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            logger.error(f"保存历史记录失败: {e}")
+            self.logger.error(f"保存历史记录失败: {e}")
 
     def add_record(self, src, dst):
-        # 检查是否已存在相同记录，若存在则更新时间并移到最前
+        # 检查是否已存在相同记录
         existing = next((item for item in self.history if item['src'] == src and item['dst'] == dst), None)
         
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
